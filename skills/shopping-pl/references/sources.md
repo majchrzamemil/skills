@@ -46,6 +46,7 @@ https://www.olx.pl/oferty/q-<query>/?page=2
 |---|---|
 | Blocking | CloudFront 403 for curl and node, even with full Chrome headers. The web-fetch tool passes. |
 | Fields in the markdown | title, price, location, date, link, sometimes delivery flag |
+| Sorting | `search[order]=filter_float_price:asc` works (the page header shows "Najtańsze (przedmiot)") — but it surfaces a wall of 1 zł service listings and spare parts, so prefer relevance order and filter the price range instead |
 | Caveat | lots of accessories and "for parts" listings — relevance filtering matters more here than anywhere else |
 | Caveat | filter and sort parameter names are OLX internals; if a filter URL returns unfiltered results, drop the parameters and filter locally |
 
