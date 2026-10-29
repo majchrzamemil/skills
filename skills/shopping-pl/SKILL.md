@@ -7,7 +7,18 @@ description: "Finds, filters and ranks purchase offers on Polish sites (Ceneo, O
 
 Turn a shopping request into a ranked shortlist of real, clickable offers.
 
-The output is always: a table of candidates, the top 3 with a one-line justification, and a short "what to avoid" note. No invented links, ever.
+The output is always: a table of candidates, the top 3 with a one-line justification, and a short "what to avoid" note.
+
+## Non-negotiables
+
+These override everything else in this file. Violating any of them means the answer is wrong, even if the analysis is good.
+
+1. **Every row carries a clickable URL.** A table without links is a failed answer. If you cannot produce a link for an offer, drop the offer.
+2. **Links come from pages you fetched in this session.** Never construct, guess, or "reconstruct" a product URL from an ID pattern.
+3. **The timestamp is in the answer.** Prices go stale within days.
+4. **Used and no-warranty are stated explicitly**, never implied away.
+5. **Read-only.** Never log in, never buy, never bid, never fill a checkout.
+6. **Failed sources are named**, never silently omitted.
 
 ## 1. Parse the request
 
@@ -107,10 +118,10 @@ Show the top 3 and the full table. If the spread between the cheapest and the me
 
 | # | Product | Price | Source | Signals | Link |
 |---|---------|-------|--------|---------|------|
-| 1 | ... | 1099 zł | ceneo.pl | 4.9/5 · 312 reviews · new | https://... |
+| 1 | ... | 1099 zł | ceneo.pl | 92/100 · 4.9/5 · 312 reviews · new | https://... |
 
 **Top 3**
-1. **<name> — <price>** — why it wins, in one line.
+1. **<name> — <price>** — why it wins, in one line. [link](https://...)
 2. ...
 3. ...
 
@@ -119,13 +130,25 @@ Show the top 3 and the full table. If the spread between the cheapest and the me
 **Recommendation:** <one sentence, including whether paying more is worth it>
 ```
 
-Rules for the answer:
+Template rules:
 
-- Every URL must come from a page you actually fetched in this session. If you did not fetch it, do not print it.
-- Include the fetch timestamp; prices go stale fast.
-- Mark `used` and "no warranty" explicitly.
-- Never log in, never buy, never bid, never fill a checkout. This skill is read-only.
-- Keep it short. The table plus 3 lines of justification beats an essay.
+- **Keep the `Link` column. Never replace it with a score column** — the score belongs in `Signals`.
+- The link is the full URL, not a bare ID, not a domain, not "see above".
+- The top 3 repeats the link again, so the user can click without scanning the table.
+
+### Self-check before sending
+
+Run this literally; if any box is unchecked, fix it first.
+
+- [ ] every table row ends with an `https://` URL
+- [ ] every URL appeared in output you actually received this session
+- [ ] the timestamp is present
+- [ ] each source you tried is either represented in the table or named as not covered
+- [ ] no two rows are the same product at the same shop
+- [ ] used items and missing warranty are visible, not buried
+
+
+Keep it short. The table plus three lines of justification beats an essay — but never at the cost of the link column. The binding rules live in **Non-negotiables** at the top of this file.
 
 ## Cost
 
