@@ -17,6 +17,7 @@ uninstall:
 
 validate:
 	@./tools/validate.sh
+	@if command -v claude >/dev/null 2>&1; then claude plugin validate .; else echo "claude CLI not found - skipped marketplace validation"; fi
 
 clean:
 	@rm -rf dist

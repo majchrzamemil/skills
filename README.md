@@ -16,6 +16,30 @@ Rules for working **in** this repo are in [`AGENTS.md`](AGENTS.md).
 
 ## Install
 
+### Claude Code (marketplace)
+
+```bash
+claude plugin marketplace add majchrzamemil/skills
+claude plugin install shopping-pl --marketplace majchrzamemil-skills
+```
+
+Or in one step inside a session (Claude Code 2.1.275+):
+
+```
+/plugin install shopping-pl --marketplace majchrzamemil/skills
+```
+
+The marketplace catalog is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json).
+Working on this repo? Register the local folder once — it then tracks your edits
+with no version bump and no reinstall:
+
+```bash
+claude plugin marketplace add .
+claude plugin install shopping-pl@majchrzamemil-skills
+```
+
+### OpenCode and other plain-layout hosts
+
 ```bash
 git clone <this-repo> ~/Documents/repos/skills
 cd ~/Documents/repos/skills
@@ -23,24 +47,23 @@ cd ~/Documents/repos/skills
 ./install.sh --dry-run  # show what would be linked
 ```
 
-`install.sh` links each skill into:
-
-- `~/.claude/skills/` — Claude Code (OpenCode also reads this path)
-- `~/.config/opencode/skills/` — OpenCode native path
-
-Because the links point at the repo, `git pull` updates every harness at once.
-Nothing needs reinstalling.
+`install.sh` links each skill into `~/.config/opencode/skills/`. Because the links
+point at the repo, `git pull` updates the harness at once. Add
+`--with-claude-links` to also symlink into `~/.claude/skills/` — only if you are
+*not* installing from the marketplace, otherwise the skill loads twice.
 
 Uninstall:
 
 ```bash
-./install.sh --uninstall
+./install.sh --uninstall                          # symlinks
+claude plugin uninstall shopping-pl               # plugin
 ```
 
 ## Validate
 
 ```bash
 make validate     # frontmatter, portability, referenced files, script deps
+                  # plus `claude plugin validate` when the CLI is present
 ```
 
 ## Conventions

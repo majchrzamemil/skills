@@ -1,0 +1,22 @@
+{
+  "name": "majchrzamemil-skills",
+  "owner": {
+    "name": "Emil Majchrzak",
+    "url": "https://github.com/majchrzamemil"
+  },
+  "metadata": {
+    "description": "Portable agent skills for Polish shopping research and anything else that lands here.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "shopping-pl",
+      "source": "./",
+      "skills": ["./skills/shopping-pl"],
+      "description": "Finds, filters and ranks purchase offers on Polish sites (Ceneo, OLX, Allegro Lokalnie, online shops) and returns a shortlist with verified links.",
+      "metadata": {
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

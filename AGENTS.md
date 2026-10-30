@@ -14,7 +14,9 @@ skills/<name>/
   references/   # detail read on demand (scoring, source registry, ...)
   scripts/      # Node 18+, zero dependencies
   adapters/     # per-host tool names and install steps; optional, host-specific
-install.sh      # symlinks every skill into the harness skill dirs
+.claude-plugin/
+  marketplace.json # the catalog Claude Code installs from
+install.sh      # symlink route for plain-layout hosts (OpenCode)
 tools/validate.sh
 tools/hooks/pre-push
 ```
@@ -45,6 +47,14 @@ of them, translate it to English.
 
 ## Changing a skill
 
+- **Every skill is registered in `.claude-plugin/marketplace.json`.** A new skill
+  needs a `plugins` entry: `name` (matching the folder), `source: "./"`,
+  `skills: ["./skills/<name>"]`, and `metadata.version`. Then bump the top-level
+  `metadata.version` (minor) and add a README row.
+- **Editing a skill bumps that entry's `metadata.version`** — patch for fixes,
+  minor for new guidance, major for a change in how the skill is used. Installs
+  from a git host are versioned; the local-folder marketplace used during
+  development picks up edits at the next session start.
 - **Frontmatter is portable.** Allowed: `name`, `description`, `license`,
   `compatibility`, `metadata`. Anything else (`allowed-tools`, `model`, `tools`,
   `permissions`) is host-specific: unknown keys are ignored by some hosts and
