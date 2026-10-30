@@ -53,8 +53,17 @@ of them, translate it to English.
   `metadata.version` (minor) and add a README row.
 - **Editing a skill bumps that entry's `metadata.version`** — patch for fixes,
   minor for new guidance, major for a change in how the skill is used. Installs
-  from a git host are versioned; the local-folder marketplace used during
-  development picks up edits at the next session start.
+  from GitHub read a clone, so a change only reaches an installed plugin after
+  `git push` and `claude plugin update <skill>`.
+- **Iterating on a skill needs no marketplace at all.** Load the working tree for
+  one session:
+  ```bash
+  claude --plugin-dir ~/Documents/repos/skills
+  ```
+  Edits take effect at the next session start (or `/reload-plugins`). Do not also
+  register the repo as a `directory` marketplace under the same name as the
+  GitHub one — a marketplace name maps to exactly one source, and adding the
+  second fails with `its source doesn't match its extraKnownMarketplaces entry`.
 - **Frontmatter is portable.** Allowed: `name`, `description`, `license`,
   `compatibility`, `metadata`. Anything else (`allowed-tools`, `model`, `tools`,
   `permissions`) is host-specific: unknown keys are ignored by some hosts and
