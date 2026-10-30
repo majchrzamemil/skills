@@ -1,6 +1,8 @@
 ---
 name: shopping-pl
-description: "Finds, filters and ranks purchase offers on Polish sites (Ceneo, OLX, Allegro Lokalnie, online shops) and returns a shortlist with verified links. Use when the user wants to buy something, compare prices, or pick the best product within a budget — triggers: \"znajdź mi\", \"kup\", \"najlepszy\", \"do X zł\", \"porównaj ceny\", \"wyszukaj ofertę\", \"aukcja\", \"ogłoszenie\", \"ile kosztuje\", \"find me\", \"best ... under\", \"price comparison\"."
+description: "Finds, filters and ranks purchase offers on Polish sites (Ceneo, OLX, Allegro Lokalnie, online shops) and returns a shortlist with verified links. Use when the user wants to buy something, compare prices, or pick the best product within a budget — triggers: \"znajdź mi\", \"kup\", \"najlepszy\", \"do X zł\", \"porównaj ceny\", \"wyszukaj ofertę\", \"aukcja\", \"ogłoszenie\", \"ile kosztuje\", \"find me\", \"best ... under\", \"price comparison\". Not for booking travel, tickets or accommodation, not for B2B procurement, tenders or invoice workflows, and not for recommending shops, brands or categories when there is no concrete product to price — this skill prices a product, it does not plan a purchase process."
+license: MIT
+compatibility: "Needs an HTTP fetch tool; a shell with Node 18+ unlocks the bundled scripts. Without a fetch tool, name the sources that could not be reached instead of estimating prices."
 ---
 
 # shopping-pl
@@ -19,6 +21,7 @@ These override everything else in this file. Violating any of them means the ans
 4. **Used and no-warranty are stated explicitly**, never implied away.
 5. **Read-only.** Never log in, never buy, never bid, never fill a checkout.
 6. **Failed sources are named**, never silently omitted.
+7. **The answer is written in the user's language.** This file is English; the reply follows the request. Polish request → Polish answer with Polish status words ("używana", "bez gwarancji"), even though every rule here is English.
 
 ## 1. Parse the request
 
@@ -56,7 +59,13 @@ Use the cheapest working channel first:
 | 2 | Harness web-fetch tool | OLX, shops, anything without a script |
 | 3 | Browser tool | Sites behind JS or a login (only if available) |
 
-Tool names differ per harness — see `references/harness.md`.
+Tool names differ per harness — see `adapters/`.
+
+### Capability tiers
+
+- **Full** (shell + fetch): run the scripts, use the fetch tool for the rest.
+- **Fetch only** (chat clients, no shell): parse the fetched page yourself, one page per source, and say that scripts were not used.
+- **No network**: do not guess prices. Say what is missing and hand the user the search plan to run themselves.
 
 ### Two hard facts, do not fight them
 

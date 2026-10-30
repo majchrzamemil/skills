@@ -1,0 +1,51 @@
+#!/bin/sh
+# Reject any push that contains an unsigned or badly signed commit.
+#
+# Install into this clone:  make hooks
+# Bypass (do not):          git push --no-verify
+set -u
+
+zero=0000000000000000000000000000000000000000
+fail=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # branch/tag deletion: nothing to check
+  [ "$local_sha" = "$zero" ] && continue
+
+  if [ "$remote_sha" = "$zero" ]; then
+    # new branch: everything not already on a remote
+    commits=$(git rev-list "$local_sha" --not --remotes=origin 2>/dev/null)
+  else
+    commits=$(git rev-list "$remote_sha..$local_sha" 2>/dev/null)
+  fi
+
+  for c in $commits; do
+    # %G? -> G good, U good/unknown validity, X/Y expired, R revoked,
+    #        N no signature, B bad signature, E cannot check
+    sig=$(git log -1 --format=%G? "$c" 2>/dev/null)
+    case "$sig" in
+      N|B|E|"")
+        echo "pre-push: unsigned or unverifiable commit $c (status: ${sig:-none})" >&2
+        git --no-pager log -1 --format='  %h %s' "$c" >&2
+        fail=1
+        ;;
+    esac
+  done
+done
+
+if [ "$fail" -ne 0 ]; then
+  cat >&2 <<'EOF'
+
+Push rejected: this repository requires signed commits.
+
+Sign the offending commits, e.g.:
+  git commit --amend -S --no-edit                 # last commit
+  git rebase --root --exec 'git commit --amend -S --no-edit'   # whole history
+
+Signing uses the GPG smartcard, so the PIN prompt must be answered
+in a real terminal.
+EOF
+  exit 1
+fi
+
+exit 0

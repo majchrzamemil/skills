@@ -66,6 +66,17 @@ for skill_path in "$SKILLS_DIR"/*/; do
   if printf '%s\n' "$fm" | grep -Eq '^(model|tools|permissions):'; then
     warn "harness-specific frontmatter key found"
   fi
+  if printf '%s\n' "$fm" | grep -Eq '^(license|compatibility|metadata):'; then
+    ok "portable optional key present"
+  fi
+
+  # --- adapters: no host tool names in the portable core ---
+  host_tools="$(grep -Eo '\b(webfetch|WebFetch|WebSearch|websearch|Bash|Task tool|skill\(\))\b' "$file" | sort -u | tr '\n' ' ' || true)"
+  if [ -n "$host_tools" ]; then
+    warn "host-specific tool name(s) in SKILL.md: ${host_tools% } — move them to adapters/"
+  else
+    ok "no host-specific tool names"
+  fi
 
   if grep -Eq '(/Users/|/home/[a-z]|~/|[A-Za-z]:\\)' "$file"; then
     fail "absolute path found in SKILL.md (breaks zip/clone portability)"
@@ -74,7 +85,7 @@ for skill_path in "$SKILLS_DIR"/*/; do
   fi
 
   # --- referenced files must exist ---
-  for ref in $(grep -Eo '(references|scripts)/[A-Za-z0-9_./-]+\.(md|mjs|js|sh|py)' "$file" | sort -u); do
+  for ref in $(grep -Eo '(adapters|references|scripts)/[A-Za-z0-9_./-]+\.(md|mjs|js|sh|py)' "$file" | sort -u); do
     if [ -e "$skill_path/$ref" ]; then
       ok "ref exists: $ref"
     else
