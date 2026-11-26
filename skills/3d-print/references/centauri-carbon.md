@@ -61,9 +61,7 @@ unknown, discover it over UDP first.
 
 ### Start print (Cmd 128)
 
-The Centauri Carbon (CC1) needs all six fields. The two-field
-`{ "Filename", "StartLayer" }` payload gets no ack, then port 3030 refuses
-connections until the printer is power-cycled (reproduced on V1.1.40 and V1.4.49).
+Send all six fields. This is what Elegoo's own clients send:
 
 ```json
 { "Filename": "<name>.gcode", "StartLayer": 0, "Calibration_switch": 1,
@@ -72,17 +70,36 @@ connections until the printer is power-cycled (reproduced on V1.1.40 and V1.4.49
 
 - `Calibration_switch` — auto bed levelling before the print (`1` on, `0` off).
   `cc.mjs print --level 0` turns it off.
+- `PrintPlatformType` — which side of the plate is up: `0` side A, `1` side B
+  (firmware sysconf `print_platform_type`; OrcaSlicer maps its PC plate to `1`).
 - `Tlp_Switch` — timelapse (`0` off).
-- `PrintPlatformType` — send `0`; other values are undocumented.
-- `slot_map` — `[]` for single-material prints.
+- `slot_map` — `[]` without a CANVAS; else `{ "t", "canvas_id", "tray_id" }` entries.
+- `Filename` — bare name as uploaded. OrcaSlicer sends `/local/<name>`; both are used.
 
-`pycentauri` lists this payload as confirmed working on CC1; the six-field form
-has not yet been run against the printer this skill was tested on. If `print`
-gets no ack or the printer stops answering, do not retry: tell the user to start
-the uploaded file from the touchscreen and to power-cycle if 3030 stays closed.
-Sources: `bjan/pycentauri` (`docs/PROTOCOL.md`, `client.py`),
-`WalkerFrederick/sdcp-centauri-carbon`, `ChestnutLabs/printer-protocol-orchard`
-(`protocols/elegoo.md`).
+Before sending, wait until `CurrentStatus` no longer contains `8` (file checking,
+right after an upload) and is `0` (idle). OrcaSlicer polls Cmd 0 once a second
+for up to 60 s, then waits up to 30 s for the Cmd 128 ack. `cc.mjs print` does the same.
+
+**Why the printer hangs.** A start command with only `Filename` and `StartLayer`
+gets no ack; then port 3030 refuses connections until a power cycle. Reproduced
+with `cc.mjs` on V1.1.40 and V1.4.49, and independently on V1.1.40 by the Home
+Assistant integration (`danielcherubini/elegoo-homeassistant` PR #297, closed
+Feb 2026 as a "firmware limitation"). Both sent the two-field payload. Every
+client reported working sends `Calibration_switch`, `PrintPlatformType` and
+`Tlp_Switch`. The likely cause is that the SDCP service reads those keys without
+checking they exist. This is an inference: the SDCP service is not in Elegoo's
+published firmware source (`elegooofficial/CentauriCarbon`), so the handler
+cannot be read.
+
+If `print` still gets no ack or the printer stops answering, do not retry. Tell
+the user to start the uploaded file from the touchscreen, and to power-cycle if
+3030 stays closed.
+
+Sources: `elegooofficial/elegoo-link`
+(`src/lan/adapters/elegoo_fdm_cc/elegoo_fdm_cc_message_adapter.cpp`),
+`OrcaSlicer/OrcaSlicer` (`src/slic3r/Utils/ElegooLink.cpp`), `bjan/pycentauri`
+(`docs/PROTOCOL.md`), `WalkerFrederick/sdcp-centauri-carbon`,
+`ChestnutLabs/printer-protocol-orchard` (`protocols/elegoo.md`).
 
 Start-print acknowledgement (`Data.Ack`): `0` ok, `1` busy, `2` not found,
 `3` MD5 failed, `4` file IO failed, `5` bad resolution, `6` unknown format,
@@ -90,16 +107,18 @@ Start-print acknowledgement (`Data.Ack`): `0` ok, `1` busy, `2` not found,
 
 ### Upload
 
-`POST http://<ip>:3030/uploadFile/upload`, `multipart/form-data` with fields:
+`POST http://<ip>:3030/uploadFile/upload`, `multipart/form-data`, one request
+per chunk of at most 1 MB (the limit Elegoo's `elegoo-link` SDK enforces). Fields:
 
-- `S-File-MD5` — hex MD5 of the file
+- `S-File-MD5` — hex MD5 of the whole file
 - `Check` — `1`
-- `Offset` — `0`
-- `Uuid` — unique per transfer
-- `TotalSize` — byte count
-- `File` — the G-code file
+- `Offset` — byte offset of this chunk
+- `Uuid` — same for every chunk of one transfer
+- `TotalSize` — byte count of the whole file
+- `File` — this chunk, with the file name
 
-Success: `{ "code": "000000", "success": true }`.
+Each chunk answers `{ "code": "000000", "success": true }`. After the last chunk
+the printer checks the file (`CurrentStatus` `8`); wait for it before Cmd 128.
 
 ### Status fields worth reading
 
@@ -108,11 +127,18 @@ Success: `{ "code": "000000", "success": true }`.
 `PrintInfo.CurrentLayer` / `TotalLayer`, `PrintInfo.CurrentTicks` / `TotalTicks`,
 `PrintInfo.Filename`, `PrintInfo.ErrorNumber`, `NetworkStatus`, `UsbDiskStatus`.
 
-Machine state (`CurrentStatus`): `0` idle, `1` printing, `2` file transfer,
-`3` calibrating, `4` device testing.
+Machine state (`CurrentStatus`, may be an array): `0` idle, `1` printing,
+`2` file transferring, `3` exposure testing (resin), `4` self-check,
+`5` auto levelling, `6` resonance testing, `7` busy, `8` file checking,
+`9` homing, `10` filament unloading, `11` PID detection.
 
-Print status: `0` idle, `1` homing, `5` pausing, `6` paused, `7` stopping,
-`8` stopped, `9` complete, `10` file checking.
+Print status (`PrintInfo.Status`): `0` idle, `1` homing, `5` pausing, `6` paused,
+`7` stopping, `8` stopped, `9` complete, `10` file checking, `11` printer checking,
+`12` resuming, `13` printing, `14` stopped on error, `15` auto levelling,
+`16` preheating, `17` resonance testing, `18` print started, `19`–`22` levelling /
+preheating / homing / resonance completed, `23` auto feeding, `24` unloading,
+`25` unloading abnormal, `26` unloading paused. (`2`–`4` are resin-only.)
+Source: `elegooofficial/elegoo-link`, CC message adapter enums.
 
 `PrintInfo.ErrorNumber`: `0` normal, `1` MD5 failed, `2` read failed,
 `3` resolution mismatch, `4` format mismatch, `5` model mismatch.

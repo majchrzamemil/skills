@@ -216,23 +216,34 @@ async function cmdUpload(flags, positionals) {
   if (!file) die('usage: cc.mjs upload --ip <ip> <file.gcode>');
   if (!existsSync(file)) die(`no such file: ${file}`);
   const buf = readFileSync(file);
+  if (!buf.length) die(`empty file: ${file}`);
   const name = basename(file);
-  const form = new FormData();
-  form.append('S-File-MD5', md5(buf));
-  form.append('Check', '1');
-  form.append('Offset', '0');
-  form.append('Uuid', uuid().replace(/-/g, ''));
-  form.append('TotalSize', String(buf.length));
-  form.append('File', new Blob([buf], { type: 'application/octet-stream' }), name);
-  const res = await fetch(`http://${ip}:${HTTP_PORT}/uploadFile/upload`, { method: 'POST', body: form });
-  const text = await res.text();
+  const fileMd5 = md5(buf);
+  const transferId = uuid().replace(/-/g, '');
+  // The firmware's upload API takes at most 1 MB per request (elegoo-link SDK).
+  const CHUNK_BYTES = 1024 * 1024;
+  let res;
   let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = { raw: text };
+  let ok = true;
+  for (let offset = 0; ok && offset < buf.length; offset += CHUNK_BYTES) {
+    const chunk = buf.subarray(offset, offset + CHUNK_BYTES);
+    const form = new FormData();
+    form.append('S-File-MD5', fileMd5);
+    form.append('Check', '1');
+    form.append('Offset', String(offset));
+    form.append('Uuid', transferId);
+    form.append('TotalSize', String(buf.length));
+    form.append('File', new Blob([chunk], { type: 'application/octet-stream' }), name);
+    res = await fetch(`http://${ip}:${HTTP_PORT}/uploadFile/upload`, { method: 'POST', body: form });
+    const text = await res.text();
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text };
+    }
+    ok = res.ok && parsed.code === '000000';
+    if (!ok) parsed = { failed_at_offset: offset, ...parsed };
   }
-  const ok = res.ok && parsed.success === true;
   log(JSON.stringify({ ip, file: name, size: bytes(buf.length), http_status: res.status, ok, response: parsed }, null, 2));
   if (!ok) process.exit(1);
 }
@@ -244,6 +255,20 @@ async function cmdPrint(flags, positionals) {
   if (!file) die('usage: cc.mjs print --ip <ip> --file <name.gcode> [--start-layer 0] [--level 1|0]');
   const startLayer = flags['start-layer'] ? Number(flags['start-layer']) : 0;
   const autoLevel = flags.level === undefined ? 1 : Number(flags.level);
+  // Same gate as Elegoo's own ElegooLink: wait out post-upload file checking, start only when idle.
+  const FILE_TRANSFERRING = 2;
+  const FILE_CHECKING = 8;
+  let machineState = [];
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    const st = await session(ip, [{ cmd: 0, id }], 1500);
+    machineState = [].concat(st.status?.CurrentStatus ?? []);
+    if (!machineState.some((v) => v === FILE_CHECKING || v === FILE_TRANSFERRING)) break;
+    await sleep(1000);
+  }
+  if (!machineState.length || machineState.some((v) => v !== 0)) {
+    die(`printer not idle (CurrentStatus ${JSON.stringify(machineState)}); not sending start`);
+  }
   // CC1 firmware hangs (port 3030 refuses) on a start command missing any of these fields.
   const data = {
     Filename: file,
@@ -253,7 +278,7 @@ async function cmdPrint(flags, positionals) {
     Tlp_Switch: 0,
     slot_map: [],
   };
-  const s = await session(ip, [{ cmd: 128, data, id }], 4000);
+  const s = await session(ip, [{ cmd: 128, data, id }], 10000);
   const ack = s.responses[0] && s.responses[0].Data ? s.responses[0].Data.Ack : undefined;
   log(JSON.stringify({ ip, file, start_layer: startLayer, ack, responses: s.responses, errors: s.errors }, null, 2));
 }

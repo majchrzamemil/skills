@@ -24,7 +24,7 @@
       "skills": ["./skills/3d-print"],
       "description": "Designs parametric OpenSCAD models from a description, photo or measurements, and slices and prints them on an ELEGOO Centauri Carbon given its IP.",
       "metadata": {
-        "version": "1.3.0"
+        "version": "1.3.1"
       }
     }
   ]
