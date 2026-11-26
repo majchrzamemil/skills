@@ -13,6 +13,28 @@ Rules for working **in** this repo are in [`AGENTS.md`](AGENTS.md).
 | Skill | What it does | Cost |
 |---|---|---|
 | [`shopping-pl`](skills/shopping-pl/SKILL.md) | Finds, filters and ranks purchase offers from Polish sites (Ceneo, OLX, Allegro Lokalnie, online shops) and returns a shortlist with verified links. | 0 (no paid APIs) |
+| [`3d-print`](skills/3d-print/SKILL.md) | Two legs: (1) design a parametric OpenSCAD model from a description, photo, link or measurements and export an STL; (2) slice with OrcaSlicer and print on an ELEGOO Centauri Carbon given its IP (stock SDCP or Klipper/Moonraker). | 0 (open-source tools) |
+
+`3d-print`'s design leg draws on prior OpenSCAD agent skills
+(`swh/openscad-skill`, `chriscantey/skill-3d-printing`, `choplin/3d-print`,
+`mitsuhiko`, `fradser`), and its print leg on community Centauri Carbon tooling
+(OpenCentauri docs, `MRoalsvig/print-automation`, `pycentauri`) and the OrcaSlicer
+CLI documentation. Full credits in
+[`skills/3d-print/references/credits.md`](skills/3d-print/references/credits.md).
+
+## Requirements
+
+`shopping-pl` needs nothing beyond an HTTP fetch tool. `3d-print` needs:
+
+| For | Software | Notes |
+|---|---|---|
+| Both legs | **Node.js 22+** | scripts use built-ins only (22+ for the SDCP WebSocket client) |
+| Design (leg 1) | **OpenSCAD** | render, preview, STL export |
+| Print (leg 2) | **OrcaSlicer** (or ELEGOO Slicer) | headless slicing + the Centauri Carbon profile |
+| Print (leg 2) | LAN access to the printer | SDCP UDP 3000 / WS 3030 / HTTP 3030 |
+
+Per-system install commands (Fedora, Debian/Ubuntu, macOS, Windows) and a verify
+step: [`skills/3d-print/references/requirements.md`](skills/3d-print/references/requirements.md).
 
 ## Install
 
