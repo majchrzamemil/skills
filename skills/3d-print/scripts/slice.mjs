@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, basename, dirname } from 'node:path';
 import { parseArgs, die, log, warn, which, run, homeDir, ensureDir } from './lib/util.mjs';
 
@@ -115,6 +115,41 @@ function pickProfile(kind, files, flag) {
   return all[0] ?? null;
 }
 
+// OrcaSlicer's CLI ignores `inherits` and silently falls back to generic defaults
+// (500 mm/s² accel, 60 mm/s walls, 35 °C bed), so the chain is merged here.
+function flattenProfile(path, candidates, seen = new Set()) {
+  if (seen.has(path)) die(`profile inheritance loop at ${path}`);
+  seen.add(path);
+  const profile = JSON.parse(readFileSync(path, 'utf8'));
+  const parentName = profile.inherits;
+  delete profile.inherits;
+  if (!parentName) return profile;
+  const parentPath = candidates
+    .filter((f) => basename(f) === `${parentName}.json`)
+    .sort((a, b) => sharedPrefix(b, path) - sharedPrefix(a, path))[0];
+  if (!parentPath) die(`parent profile "${parentName}" of ${path} not found; pass --profiles <dir>`);
+  return { ...flattenProfile(parentPath, candidates, seen), ...profile };
+}
+
+function sharedPrefix(a, b) {
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i++;
+  return i;
+}
+
+function writeFlatProfiles(d, picked, outdir, bedType) {
+  const dir = join(outdir, 'profiles');
+  ensureDir(dir);
+  const out = {};
+  for (const [kind, path] of Object.entries(picked)) {
+    const flat = flattenProfile(path, d[kind]);
+    if (kind === 'process' && bedType) flat.curr_bed_type = bedType;
+    out[kind] = join(dir, `${kind}.json`);
+    writeFileSync(out[kind], JSON.stringify(flat, null, 2));
+  }
+  return out;
+}
+
 function discover(flags) {
   const binary = findBinary(flags.slicer);
   const roots = profileRoots(flags);
@@ -149,6 +184,9 @@ function cmdLocate(flags) {
 }
 
 const PLA_DENSITY_G_CM3 = 1.24;
+// The Centauri Carbon ships with a textured PEI plate (machine default_bed_type 4);
+// the CLI otherwise assumes Cool Plate and its cooler bed temperatures.
+const DEFAULT_BED_TYPE = 'Textured PEI Plate';
 
 function extractStats(gcodePath) {
   try {
@@ -170,6 +208,12 @@ function extractStats(gcodePath) {
       printer: field('printer_settings_id'),
       process: field('print_settings_id'),
       filament: field('filament_settings_id'),
+      bed_type: field('curr_bed_type'),
+      layer_height: field('layer_height'),
+      default_acceleration: field('default_acceleration'),
+      outer_wall_speed: field('outer_wall_speed'),
+      nozzle_temperature: field('nozzle_temperature'),
+      bed_temperature_initial_layer: gcode.match(/^M190 S(\d+)/m)?.[1] ?? null,
     };
   } catch (e) {
     return { error: String(e) };
@@ -178,7 +222,7 @@ function extractStats(gcodePath) {
 
 function cmdRun(flags, positionals) {
   const model = positionals[0];
-  if (!model) die('usage: slice.mjs run <model.stl> [--outdir dir] [--profiles dir] [--machine m.json --process p.json --filament f.json] [--plate 0] [--arrange]');
+  if (!model) die('usage: slice.mjs run <model.stl> [--outdir dir] [--profiles dir] [--machine m.json --process p.json --filament f.json] [--plate 0] [--arrange] [--bed-type "Textured PEI Plate"]');
   if (!existsSync(model)) die(`no such file: ${model}`);
   const d = discover(flags);
   if (!d.binary) die('no slicer found. Install OrcaSlicer (or ELEGOO Slicer) or pass --slicer /path/to/binary.');
@@ -191,10 +235,12 @@ function cmdRun(flags, positionals) {
   const outdir = resolve(flags.outdir || 'gcode');
   ensureDir(outdir);
   const plate = flags.plate !== undefined ? String(flags.plate) : '0';
+  const bedType = flags['bed-type'] || DEFAULT_BED_TYPE;
+  const flat = writeFlatProfiles(d, { machine, process: processProfile, filament }, outdir, bedType);
   const args = [
     '--slice', plate,
-    '--load-settings', `${machine};${processProfile}`,
-    '--load-filaments', filament,
+    '--load-settings', `${flat.machine};${flat.process}`,
+    '--load-filaments', flat.filament,
     '--outputdir', outdir,
   ];
   if (flags.arrange) args.push('--arrange', '1');

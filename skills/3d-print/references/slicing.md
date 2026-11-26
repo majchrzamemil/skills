@@ -32,8 +32,71 @@ orca-slicer \
   (`layer_height` → `--layer-height`).
 
 `scripts/slice.mjs run <model.stl>` wraps all of this and prints the resulting
-G-code path plus a parsed summary. `scripts/slice.mjs locate` reports which binary
-and profiles it found.
+G-code path plus a parsed summary (print time, filament, bed type, layer height,
+default acceleration, outer-wall speed, nozzle and first-layer bed temperature).
+`scripts/slice.mjs locate` reports which binary and profiles it found.
+
+## The CLI does not resolve `inherits`
+
+Vendor profiles are inheritance chains, for example:
+
+```
+fdm_process_ecc_common -> fdm_process_ecc -> fdm_process_ecc_04020
+  -> 0.20mm Standard @Elegoo CC 0.4 nozzle -> 0.28mm Extra Draft @Elegoo CC 0.4 nozzle
+```
+
+OrcaSlicer 2.3.2's CLI loads only the file it is given and silently fills every key
+the leaf does not set with Orca's generic defaults. This hits all three profiles:
+
+| Key | Generic fallback | Resolved Elegoo value |
+|---|---|---|
+| `default_acceleration` | 500 | 10000 |
+| `outer_wall_speed` / `inner_wall_speed` | 60 / 60 | 160 / 200 |
+| `sparse_infill_speed` / `travel_speed` | 100 / 120 | 200 / 500 |
+| `machine_max_acceleration_x` | 1000 | 20000 |
+| `textured_plate_temp` (PLA) | 45 | 60 |
+
+Measured on a 40 × 40 × 20 mm cube: 42 min unresolved, 14.5 min resolved.
+
+`slice.mjs run` therefore merges each chain (parent first, child overrides) into one
+flat JSON per kind, writes them to `<outdir>/profiles/`, and passes those. A
+missing parent is a hard error, not a silent fallback. Run any hand-built profile
+through the same path; never pass a child preset straight to `orca-slicer`.
+
+## Bed type
+
+The CLI assumes `Cool Plate` unless told otherwise, and Elegoo/Orca PLA profiles
+set the cool-plate bed to 35 °C — too cold for PLA on the Centauri Carbon's
+textured PEI plate. The machine profile's `default_bed_type` is `4` (Textured PEI
+Plate). `slice.mjs run` writes `curr_bed_type = "Textured PEI Plate"` into the
+flattened process, which gives 60 °C for Elegoo PLA. Pass
+`--bed-type "<name>"` only if the user has fitted a different plate. Check
+`bed_temperature_initial_layer` in the summary before printing.
+
+## Stock speeds (Centauri Carbon, 0.4 nozzle, 0.20 mm Standard)
+
+Resolved from the Elegoo ECC chain shipped with OrcaSlicer 2.3.2:
+
+| Setting | Value |
+|---|---|
+| `default_acceleration` | 10000 mm/s² |
+| `outer_wall_acceleration` | 5000 mm/s² |
+| `inner_wall_acceleration` / `travel_acceleration` | 0 (= default, 10000) |
+| `initial_layer_acceleration` | 500 mm/s² |
+| `outer_wall_speed` | 160 mm/s |
+| `inner_wall_speed` | 200 mm/s |
+| `sparse_infill_speed` | 200 mm/s |
+| `internal_solid_infill_speed` | 250 mm/s |
+| `top_surface_speed` | 200 mm/s |
+| `travel_speed` | 500 mm/s |
+| `initial_layer_speed` / `initial_layer_infill_speed` | 50 / 105 mm/s |
+| `machine_max_acceleration_x/y` | 20000 mm/s² |
+| PLA `filament_max_volumetric_speed` | 21 mm³/s |
+
+The volumetric limit, not the speed, usually caps infill at 0.28 mm layers.
+For a faster print change the process (`0.24mm Draft`, `0.28mm Extra Draft`),
+infill or walls — do not override these speeds or accelerations downward. A
+"fast" custom profile with 4000 mm/s² and 120/150 mm/s walls was slower than stock.
 
 ## Profiles
 
@@ -85,6 +148,8 @@ do one supervised test print.
 - Match the process to the nozzle: `0.20 mm` layer for a 0.4 mm nozzle is the safe default.
 - Match temperatures and flow to the loaded spool; if the user has not said which
   filament is loaded, ask before starting.
+- Long thin parts or small footprints: add a brim (`brim_type = outer_only`,
+  `brim_width = 5`–`6` mm) to keep the ends from lifting.
 - For structural parts, 4+ walls and 25–40% infill; for display parts, 2–3 walls and
   10–15%. State what you chose.
 

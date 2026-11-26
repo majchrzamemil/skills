@@ -49,9 +49,9 @@ If no shell is available, hand over the `.scad` text plus the exact render/expor
 Protocol detail: `references/centauri-carbon.md`. Slicing detail: `references/slicing.md`.
 
 1. **Reach the printer.** Use the IP the user gave. `scripts/cc.mjs status --ip <ip>` reports state, temperatures and loaded file; it also discovers the board id over UDP. If the printer runs OpenCentauri COSMOS (real Klipper + Moonraker) instead of stock firmware, use `scripts/moonraker.mjs`.
-2. **Slice.** `scripts/slice.mjs` locates the slicer and the Centauri Carbon machine/process/filament profiles and produces `plate_1.gcode`, with print time and filament grams parsed from the G-code header. Show those numbers.
+2. **Slice.** `scripts/slice.mjs` locates the slicer and the Centauri Carbon machine/process/filament profiles, flattens their `inherits` chains (the CLI ignores them and falls back to slow generic defaults), sets the textured PEI bed type, and produces `plate_1.gcode`. Show print time, filament grams, layer height, bed temperature and the speeds it reports. For a faster print pick a coarser process; never lower the stock speeds or accelerations (`references/slicing.md`).
 3. **Confirm.** Present: the model preview, print time, filament used, bounding box, and the profile/material. Get an explicit go. (This is non-negotiable #6.)
-4. **Send.** Upload the G-code over SDCP (`scripts/cc.mjs upload`), then start it (`scripts/cc.mjs print`). Report the printer's acknowledgement.
+4. **Send.** Upload the G-code over SDCP (`scripts/cc.mjs upload`), then start it (`scripts/cc.mjs print`). Report the printer's acknowledgement. No ack means the firmware may have hung: do not retry; ask the user to start the file from the touchscreen.
 5. **Watch.** Stream status (`scripts/cc.mjs watch`). Surface progress and any error. Pause/resume/stop on request (`scripts/cc.mjs pause|resume|stop`).
 
 ## Scripts
@@ -73,7 +73,7 @@ Tool names differ per host — see `adapters/`.
 - `references/cad-and-openscad.md` — OpenSCAD house style, BOSL2, printability rules, tolerances, the validation loop.
 - `references/printers.md` — printer spec table and how to add one (keeps leg 1 generic).
 - `references/centauri-carbon.md` — SDCP protocol, commands, status/error codes, quirks, Moonraker path.
-- `references/slicing.md` — OrcaSlicer/ELEGOO Slicer CLI, finding profiles, start/end-G-code caveat.
+- `references/slicing.md` — OrcaSlicer/ELEGOO Slicer CLI, finding profiles, profile flattening, bed type, stock speeds, start/end-G-code caveat.
 - `references/cad-options.md` — OpenSCAD vs build123d vs importing STEP/STL, and what is out of scope.
 - `references/credits.md` — the prior work this skill drew on.
 

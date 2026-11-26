@@ -46,7 +46,7 @@ unknown, discover it over UDP first.
 |---|---|---|
 | 0 | Request status refresh | `{}` |
 | 1 | Request attributes | `{}` |
-| 128 | Start print | `{ "Filename": "<name>", "StartLayer": 0 }` |
+| 128 | Start print | full payload, see below |
 | 129 | Pause | `{}` |
 | 130 | Stop | `{}` |
 | 131 | Resume | `{}` |
@@ -58,6 +58,31 @@ unknown, discover it over UDP first.
 | 320 / 321 | History / task detail | `{}` / `{ "Id": [...] }` |
 | 386 / 387 | Video stream / timelapse | `{ "Enable": 1 }` |
 | 403 | Set speed / fans | `{ "PrintSpeedPct": 50 }` or `{ "TargetFanSpeed": {...} }` |
+
+### Start print (Cmd 128)
+
+The Centauri Carbon (CC1) needs all six fields. The two-field
+`{ "Filename", "StartLayer" }` payload gets no ack, then port 3030 refuses
+connections until the printer is power-cycled (reproduced on V1.1.40 and V1.4.49).
+
+```json
+{ "Filename": "<name>.gcode", "StartLayer": 0, "Calibration_switch": 1,
+  "PrintPlatformType": 0, "Tlp_Switch": 0, "slot_map": [] }
+```
+
+- `Calibration_switch` — auto bed levelling before the print (`1` on, `0` off).
+  `cc.mjs print --level 0` turns it off.
+- `Tlp_Switch` — timelapse (`0` off).
+- `PrintPlatformType` — send `0`; other values are undocumented.
+- `slot_map` — `[]` for single-material prints.
+
+`pycentauri` lists this payload as confirmed working on CC1; the six-field form
+has not yet been run against the printer this skill was tested on. If `print`
+gets no ack or the printer stops answering, do not retry: tell the user to start
+the uploaded file from the touchscreen and to power-cycle if 3030 stays closed.
+Sources: `bjan/pycentauri` (`docs/PROTOCOL.md`, `client.py`),
+`WalkerFrederick/sdcp-centauri-carbon`, `ChestnutLabs/printer-protocol-orchard`
+(`protocols/elegoo.md`).
 
 Start-print acknowledgement (`Data.Ack`): `0` ok, `1` busy, `2` not found,
 `3` MD5 failed, `4` file IO failed, `5` bad resolution, `6` unknown format,

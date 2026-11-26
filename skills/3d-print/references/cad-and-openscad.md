@@ -47,6 +47,8 @@ Rules that keep a model usable:
 - **One top-level object.** Everything is composed from named modules.
 - **`$fn` is a parameter**, so previews can be fast and exports smooth.
 - **Model in the orientation you will print**, or say explicitly what orientation is intended.
+  A shell or cover prints closed face down: a solid first layer, no bridged roof,
+  and no thin wall outline that can lift.
 - **Build on the origin**, resting on `z = 0`, so the slicer's placement is predictable.
 - **Multi-part designs take a `part` parameter** (`part = "base"; // [base, lid]`) and
   place each part in its assembled position, so `openscad.mjs fit` can test the fit.

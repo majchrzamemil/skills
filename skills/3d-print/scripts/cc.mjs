@@ -241,9 +241,19 @@ async function cmdPrint(flags, positionals) {
   const ip = requireIp(flags);
   const id = await resolveId(ip, flags.id);
   const file = flags.file || positionals[0];
-  if (!file) die('usage: cc.mjs print --ip <ip> --file <name.gcode> [--start-layer 0]');
+  if (!file) die('usage: cc.mjs print --ip <ip> --file <name.gcode> [--start-layer 0] [--level 1|0]');
   const startLayer = flags['start-layer'] ? Number(flags['start-layer']) : 0;
-  const s = await session(ip, [{ cmd: 128, data: { Filename: file, StartLayer: startLayer }, id }], 4000);
+  const autoLevel = flags.level === undefined ? 1 : Number(flags.level);
+  // CC1 firmware hangs (port 3030 refuses) on a start command missing any of these fields.
+  const data = {
+    Filename: file,
+    StartLayer: startLayer,
+    Calibration_switch: autoLevel,
+    PrintPlatformType: 0,
+    Tlp_Switch: 0,
+    slot_map: [],
+  };
+  const s = await session(ip, [{ cmd: 128, data, id }], 4000);
   const ack = s.responses[0] && s.responses[0].Data ? s.responses[0].Data.Ack : undefined;
   log(JSON.stringify({ ip, file, start_layer: startLayer, ack, responses: s.responses, errors: s.errors }, null, 2));
 }
