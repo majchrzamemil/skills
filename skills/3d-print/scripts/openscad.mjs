@@ -27,6 +27,10 @@ function defines(flags) {
   return out;
 }
 
+function imgsize(flags) {
+  return String(flags.size || '1024,768').replace('x', ',');
+}
+
 function runOpenscad(binary, args) {
   const res = run(binary, args);
   const combined = `${res.stdout}\n${res.stderr}`;
@@ -34,6 +38,7 @@ function runOpenscad(binary, args) {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => /^(ERROR|WARNING)/i.test(l));
+  if (res.code !== 0 && !problems.length) problems.push(...res.stderr.split('\n').map((l) => l.trim()).filter(Boolean));
   return { res, problems };
 }
 
@@ -105,11 +110,11 @@ function cmdRender(flags, positionals) {
 
 function cmdPreview(flags, positionals) {
   const file = positionals[0];
-  if (!file) die('usage: openscad.mjs preview <model.scad> [--outdir dir] [--views iso,top,front,right] [--size 1024x768]');
+  if (!file) die('usage: openscad.mjs preview <model.scad> [--outdir dir] [--views iso,top,front,right] [--size 1024,768]');
   if (!existsSync(file)) die(`no such file: ${file}`);
   const outdir = resolve(flags.outdir || 'preview');
   ensureDir(outdir);
-  const size = flags.size || '1024x768';
+  const size = imgsize(flags);
   const names = (flags.views ? String(flags.views).split(',') : Object.keys(VIEWS)).filter((v) => VIEWS[v]);
   const rendered = [];
   for (const name of names) {
@@ -132,7 +137,7 @@ function cmdPreview(flags, positionals) {
 
 function cmdSection(flags, positionals) {
   const file = positionals[0];
-  if (!file) die('usage: openscad.mjs section <model.scad> [--outdir dir] [--axis z|y|x] [--size 1024x768]');
+  if (!file) die('usage: openscad.mjs section <model.scad> [--outdir dir] [--axis z|y|x] [--size 1024,768]');
   if (!existsSync(file)) die(`no such file: ${file}`);
   const outdir = resolve(flags.outdir || 'preview');
   ensureDir(outdir);
@@ -155,7 +160,7 @@ function cmdSection(flags, positionals) {
   const out = join(outdir, `${basename(file).replace(/\.scad$/i, '')}-section-${axis}.png`);
   const args = [
     '-o', out,
-    '--imgsize', flags.size || '1024x768',
+    '--imgsize', imgsize(flags),
     '--camera', '0,0,0,55,0,25,0',
     '--viewall', '--autocenter',
     '--projection', 'p',

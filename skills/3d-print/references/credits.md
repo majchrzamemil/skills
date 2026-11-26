@@ -30,7 +30,7 @@ was copied verbatim — the patterns and structure are credited here.
   SDCP is reachable on the LAN without cloud.
 - **OrcaSlicer CLI documentation** (`orcaslicer.com/wiki/cli`) and the
   **`CapitanaIcoachai/orcaslicer-cli-cookbook`** — the headless invocation, profile
-  loading, `--export-statistics`, and the profile-discovery pitfalls that
+  loading and the profile-discovery pitfalls that
   `references/slicing.md` captures.
 
 ## Prior art in this repo

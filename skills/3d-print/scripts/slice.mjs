@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import { join, resolve, basename, dirname } from 'node:path';
-import { parseArgs, die, log, warn, which, run, homeDir, ensureDir, readJson } from './lib/util.mjs';
+import { parseArgs, die, log, warn, which, run, homeDir, ensureDir } from './lib/util.mjs';
 
 const BIN_NAMES = ['orca-slicer', 'OrcaSlicer', 'orca_slicer', 'elegoo-slicer', 'ElegooSlicer', 'elegooslicer'];
 
@@ -74,53 +74,57 @@ function walkJson(dir, depth = 0, acc = []) {
 }
 
 function classify(files) {
-  const machine = [];
-  const process = [];
-  const filament = [];
+  const found = { machine: [], process: [], filament: [] };
   for (const f of files) {
-    const parent = basename(dirname(f)).toLowerCase();
-    const base = basename(f).toLowerCase();
-    if (parent === 'machine') machine.push(f);
-    else if (parent === 'process') process.push(f);
-    else if (parent === 'filament') filament.push(f);
-    else if (/centauri/.test(base)) machine.push(f);
+    // Vendor trees nest presets one level deeper, e.g. Elegoo/process/ECC/*.json.
+    const segments = dirname(f).toLowerCase().split(/[\\/]/).reverse();
+    const kind = segments.find((s) => s in found);
+    if (kind) found[kind].push(f);
+    else if (/centauri/i.test(basename(f))) found.machine.push(f);
   }
-  return { machine, process, filament };
+  return found;
 }
+
+// First tier with a match wins; Orca ships every vendor, so unscoped matches pick the wrong one.
+const PROFILE_TIERS = {
+  machine: [
+    [/centauri carbon 0\.4 nozzle/i],
+    [/centauri/i, /carbon/i],
+    [/centauri/i],
+  ],
+  process: [
+    [/0\.20mm standard/i, /@elegoo cc 0\.4 nozzle/i],
+    [/@elegoo cc 0\.4 nozzle/i],
+    [/@elegoo cc|centauri/i],
+    [/0\.20|0\.2mm|standard/i],
+  ],
+  filament: [
+    [/^elegoo pla @ecc\.json$/i],
+    [/@ecc/i, /pla/i],
+    [/pla/i, /generic|elegoo/i],
+  ],
+};
 
 function pickProfile(kind, files, flag) {
   if (flag) return flag;
   const all = files[kind];
-  if (!all.length) return null;
-  if (kind === 'machine') {
-    const cc = all.filter((f) => /centauri/i.test(f) && /carbon/i.test(f));
-    const pool = cc.length ? cc : all.filter((f) => /centauri/i.test(f));
-    return (pool.length ? pool : all)[0];
+  for (const tier of PROFILE_TIERS[kind]) {
+    const hit = all.find((f) => tier.every((re) => re.test(basename(f))));
+    if (hit) return hit;
   }
-  if (kind === 'process') {
-    const pref = all.filter((f) => /0\.20|0\.2mm|standard/i.test(f));
-    return (pref.length ? pref : all)[0];
-  }
-  if (kind === 'filament') {
-    const pref = all.filter((f) => /pla/i.test(f) && /generic|elegoo/i.test(f));
-    return (pref.length ? pref : all)[0];
-  }
-  return all[0];
+  return all[0] ?? null;
 }
 
 function discover(flags) {
   const binary = findBinary(flags.slicer);
   const roots = profileRoots(flags);
   const files = roots.flatMap((r) => walkJson(r));
-  const files2 = files.length ? files : [];
-  const { machine, process, filament } = classify(files2);
+  const found = classify(files);
   return {
     binary,
     roots,
-    counts: { json: files2.length, machine: machine.length, process: process.length, filament: filament.length },
-    machine,
-    process,
-    filament,
+    counts: { json: files.length, machine: found.machine.length, process: found.process.length, filament: found.filament.length },
+    ...found,
   };
 }
 
@@ -144,27 +148,28 @@ function cmdLocate(flags) {
   log(JSON.stringify(out, null, 2));
 }
 
-function extractStats(path) {
+const PLA_DENSITY_G_CM3 = 1.24;
+
+function extractStats(gcodePath) {
   try {
-    const j = readJson(path);
-    const flat = {};
-    const visit = (o, prefix = '') => {
-      if (o && typeof o === 'object') {
-        for (const [k, v] of Object.entries(o)) visit(v, prefix ? `${prefix}.${k}` : k);
-      } else {
-        flat[prefix] = o;
-      }
+    const gcode = readFileSync(gcodePath, 'utf8');
+    const field = (key) => {
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return gcode.match(new RegExp(`^; ${escaped} = (.+)$`, 'm'))?.[1].trim().replace(/^"(.*)"$/, '$1') ?? null;
     };
-    visit(j);
-    const pick = (re) => {
-      for (const [k, v] of Object.entries(flat)) if (re.test(k)) return { key: k, value: v };
-      return null;
-    };
+    const filamentCm3 = parseFloat(field('filament used [cm3]'));
+    const density = parseFloat(field('filament_density')) || PLA_DENSITY_G_CM3;
+    // Some presets (e.g. Elegoo PLA @ECC) report 0 g, so derive grams from volume.
+    let filamentG = parseFloat(field('total filament used [g]'));
+    if (!(filamentG > 0) && filamentCm3 > 0) filamentG = +(filamentCm3 * density).toFixed(2);
     return {
-      print_time: pick(/time/i),
-      filament_g: pick(/filament.*(g|gram)/i),
-      filament_m: pick(/filament.*(m|metre|meter|length)/i),
-      raw: j,
+      print_time: field('estimated printing time (normal mode)'),
+      filament_mm: parseFloat(field('filament used [mm]')) || null,
+      filament_cm3: filamentCm3 || null,
+      filament_g: filamentG || null,
+      printer: field('printer_settings_id'),
+      process: field('print_settings_id'),
+      filament: field('filament_settings_id'),
     };
   } catch (e) {
     return { error: String(e) };
@@ -178,20 +183,19 @@ function cmdRun(flags, positionals) {
   const d = discover(flags);
   if (!d.binary) die('no slicer found. Install OrcaSlicer (or ELEGOO Slicer) or pass --slicer /path/to/binary.');
   const machine = pickProfile('machine', d, flags.machine);
-  const process = pickProfile('process', d, flags.process);
+  const processProfile = pickProfile('process', d, flags.process);
   const filament = pickProfile('filament', d, flags.filament);
   if (!machine) die('no machine profile found. Export a preset bundle from the slicer or pass --machine.');
-  if (!process) die('no process profile found. Pass --process.');
+  if (!processProfile) die('no process profile found. Pass --process.');
   if (!filament) die('no filament profile found. Pass --filament.');
   const outdir = resolve(flags.outdir || 'gcode');
   ensureDir(outdir);
   const plate = flags.plate !== undefined ? String(flags.plate) : '0';
   const args = [
     '--slice', plate,
-    '--load-settings', `${machine};${process}`,
+    '--load-settings', `${machine};${processProfile}`,
     '--load-filaments', filament,
     '--outputdir', outdir,
-    '--export-statistics',
   ];
   if (flags.arrange) args.push('--arrange', '1');
   args.push(resolve(model));
@@ -201,16 +205,13 @@ function cmdRun(flags, positionals) {
   const produced = existsSync(outdir)
     ? readdirSync(outdir).filter((f) => f.endsWith('.gcode')).map((f) => join(outdir, f))
     : [];
-  const stats = produced
-    .map((g) => join(dirname(g), basename(g).replace(/\.gcode$/i, '.statistics.json')))
-    .filter(existsSync)
-    .map((s) => ({ file: s, ...extractStats(s) }));
+  const stats = produced.map((g) => ({ file: g, ...extractStats(g) }));
   const ok = produced.length > 0 && res.code === 0;
   log(JSON.stringify({
     ok,
     slicer: d.binary,
     exit: res.code,
-    profiles: { machine, process, filament },
+    profiles: { machine, process: processProfile, filament },
     gcode: produced,
     statistics: stats,
     problems,

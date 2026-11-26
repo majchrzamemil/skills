@@ -12,15 +12,21 @@ orca-slicer \
   --load-settings "machine.json;process.json" \
   --load-filaments "filament.json" \
   --outputdir ./out \
-  --export-statistics \
   model.stl
 ```
 
 - `--slice 0` slices every plate and writes `plate_1.gcode`, `plate_2.gcode`, …
 - `--load-settings` is a semicolon-separated list: **machine first, process second**.
 - `--load-filaments` is separate.
-- `--export-statistics` writes `plate_1.statistics.json` next to the G-code with
-  predicted print time and filament totals — read these and show the user.
+- There is no statistics file (OrcaSlicer 2.3.2 has no `--export-statistics`; passing
+  it fails with `setup params error`). Print time and filament totals are `; key = value`
+  lines in the G-code (`estimated printing time (normal mode)`, `filament used [mm]`,
+  `filament used [cm3]`, `total filament used [g]`) — read these and show the user.
+  Some presets report `0.00` g; derive grams from cm3 × `filament_density`.
+- Bundled vendor presets nest one level deeper (`Elegoo/process/ECC/*.json`). Without
+  scoping, the first alphabetical match is another vendor's. Known-good Centauri Carbon
+  defaults: `Elegoo Centauri Carbon 0.4 nozzle`, `0.20mm Standard @Elegoo CC 0.4 nozzle`,
+  `Elegoo PLA @ECC`.
 - `--arrange 1` packs several models on one plate; without it they stack at the origin.
 - CLI flags use hyphens, not the underscore keys from the profile JSON
   (`layer_height` → `--layer-height`).
