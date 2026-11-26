@@ -13,7 +13,7 @@ Tool names in this host:
 Prerequisites:
 
 - `node` 22+ (the SDCP client uses the built-in WebSocket).
-- `openscad` on PATH for leg 1.
+- `openscad` on PATH and BOSL2 installed for leg 1 (`references/requirements.md`).
 - OrcaSlicer (or ELEGOO Slicer) for leg 2.
 
 Install as a plugin from the marketplace in this repo, or symlink the skill folder

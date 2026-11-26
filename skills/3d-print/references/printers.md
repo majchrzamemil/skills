@@ -27,12 +27,12 @@ needs the build volume and nozzle; leg 2 needs the control path.
 
 ## What leg 1 checks
 
-Given a printer profile, leg 1 checks:
+`scripts/openscad.mjs check` takes the printer's numbers as flags:
 
-- the model's bounding box fits the build volume with a margin;
-- minimum wall thickness is at least ~2× the nozzle diameter;
-- overhangs are within what the machine handles without supports (45° is a safe
-  default for a 0.4 mm direct-drive extruder).
+- `--bed X,Y,Z` (and `--margin`, default 5 mm): the bounding box fits the build volume;
+- `--min-wall`: at least 2× the nozzle diameter (0.8 mm for a 0.4 mm nozzle);
+- `--overhang`: steepest unsupported angle from vertical (45° is a safe default for
+  a 0.4 mm direct-drive extruder).
 
 If the user has not named a printer, ask, or assume a 220 × 220 × 250 mm bed and
 state that assumption.

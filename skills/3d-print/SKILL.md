@@ -2,7 +2,7 @@
 name: 3d-print
 description: "Turns a 3D-printing request into a printed part, in two legs. Leg 1 (any printer): from a description, photo, screenshot, link or caliper measurements, author a parametric OpenSCAD model, validate printability and export STL. Leg 2 (ELEGOO Centauri Carbon): given the printer's IP, slice with OrcaSlicer and upload/start the print over the stock SDCP interface or Klipper/Moonraker. Use for \"design a part\", \"model this\", \"make an STL\", \"3D print this\", \"print it on my printer\", \"slice and print\", \"send to the 3D printer\". Not for resin/SLA printing, not for photo-to-mesh reconstruction (photogrammetry or AI image-to-3D), not for laser cutting or CNC, and not for printer hardware repair or firmware flashing."
 license: MIT
-compatibility: "Leg 1 needs OpenSCAD on PATH. Leg 2 needs a slicer (OrcaSlicer or ELEGOO Slicer) and LAN access to the printer. The bundled scripts run on Node 22+ with no dependencies (22+ gives the built-in WebSocket the SDCP client needs)."
+compatibility: "Leg 1 needs OpenSCAD on PATH and the BOSL2 library. Leg 2 needs a slicer (OrcaSlicer or ELEGOO Slicer) and LAN access to the printer. The bundled scripts run on Node 22+ with no dependencies (22+ gives the built-in WebSocket the SDCP client needs)."
 ---
 
 # 3d-print
@@ -25,7 +25,7 @@ These override everything else. Breaking one means the answer is wrong even if t
 
 **Leg 1**
 4. **The `.scad` source is the deliverable; the STL is an export of it.** The model stays parametric — named parameters at the top, not magic numbers inline.
-5. **Validate before delivering:** render, look at the images yourself, check manifoldness, minimum wall thickness, overhangs and bed fit. A model you never rendered is not finished.
+5. **Validate before delivering, with numbers first:** `scripts/openscad.mjs check` must report no `problems` (closed solid, minimum wall, bed fit), and every overhang it lists is fixed or called out. Then read the renders. Never claim a check the script did not run.
 
 **Leg 2**
 6. **Never start a print without explicit confirmation.** Show the sliced preview, print time, filament used and the model's bounding box, then wait for a clear "go". Pause and stop must always work.
@@ -38,8 +38,8 @@ These override everything else. Breaking one means the answer is wrong even if t
 Detail: `references/cad-and-openscad.md`, printer specs in `references/printers.md`, format choices in `references/cad-options.md`.
 
 1. **Intake.** Collect: what the part is for, the inputs (description / photo / screenshot / link / caliper measurements), and the constraints (size, load, mating surfaces, material). Ask for caliper measurements only where the part must fit something real. A photo is a *reference for shape and proportions* — it is not a 3D reconstruction; never claim you measured a photo.
-2. **Author.** Write a parametric OpenSCAD file: every meaningful dimension as a named variable at the top, sensible defaults, a comment block stating intent and assumptions. Import an existing STL/STEP if the user supplied geometry to build on.
-3. **Validate.** Render multi-view PNGs and a section cut with `scripts/openscad.mjs`, then read those images and check the geometry. Check the bounding box against the target printer's build volume (`scripts/openscad.mjs info`). Fix and re-render until it is right.
+2. **Author.** Write a parametric OpenSCAD file using BOSL2 for rounding, chamfers, teardrop holes, screw holes and placement: every meaningful dimension as a named variable at the top, sensible defaults, a comment block stating intent and assumptions. Import an existing STL/STEP if the user supplied geometry to build on.
+3. **Validate.** Run `check` with the target printer's `--bed` and `--min-wall`; for mating parts also run `fit`. Then render `preview` PNGs and a `section` through each hole, boss and wall that matters, and read them. Fix and repeat until `check` is clean and the images match the intent.
 4. **Deliver.** The `.scad` file, the exported STL, the preview images, and a short note: parameters, assumptions, print orientation, and suggested material/profile. Offer 3MF only if the host can produce it.
 
 If no shell is available, hand over the `.scad` text plus the exact render/export commands instead of pretending to have run them.
@@ -60,7 +60,7 @@ Node 22+, no dependencies. Each prints compact JSON or human text on stdout.
 
 | Script | Purpose |
 |---|---|
-| `scripts/openscad.mjs` | `render` (STL), `preview` (multi-view PNGs), `section` (cut view), `info` (bbox + triangle count) |
+| `scripts/openscad.mjs` | `render` (STL), `preview` (multi-view PNGs with mm scales), `section` (exact 2D slice at `--at`), `info` (bbox), `check` (closed solid, wall thickness, overhangs, bed fit), `fit` (overlap and clearance between two parts) |
 | `scripts/slice.mjs` | `locate` (find slicer + profiles), `run` (slice STL → G-code + stats) |
 | `scripts/cc.mjs` | `discover`, `status`, `watch`, `files`, `upload`, `print`, `pause`, `resume`, `stop` (stock SDCP) |
 | `scripts/moonraker.mjs` | Same verbs for an OpenCentauri COSMOS / Klipper printer |
@@ -70,7 +70,7 @@ Tool names differ per host — see `adapters/`.
 ## References
 
 - `references/requirements.md` — software to install for full support (Node, OpenSCAD, slicer), per system.
-- `references/cad-and-openscad.md` — OpenSCAD house style, parameters, printability rules, tolerances.
+- `references/cad-and-openscad.md` — OpenSCAD house style, BOSL2, printability rules, tolerances, the validation loop.
 - `references/printers.md` — printer spec table and how to add one (keeps leg 1 generic).
 - `references/centauri-carbon.md` — SDCP protocol, commands, status/error codes, quirks, Moonraker path.
 - `references/slicing.md` — OrcaSlicer/ELEGOO Slicer CLI, finding profiles, start/end-G-code caveat.

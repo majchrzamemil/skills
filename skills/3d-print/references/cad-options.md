@@ -16,12 +16,16 @@ is deliberately out of scope.
 
 ## OpenSCAD vs build123d / CadQuery
 
-- **OpenSCAD** — best when the part is built from primitives and booleans, when you
-  want a single text file, and when you want the Customizer. Preferred here.
-- **build123d / CadQuery** — Python, better for real CAD kernels (fillets, chamfers,
-  STEP export, constraint-style modelling). Use only if Python is available and the
-  part genuinely needs it; the printability and validation rules in
-  `cad-and-openscad.md` still apply.
+- **OpenSCAD + BOSL2** — best when the part is built from primitives and booleans,
+  when you want a single text file, and when you want the Customizer. BOSL2 adds
+  rounding, chamfers, teardrops, screw holes and attachments. Preferred here: the
+  language is small, so generated code fails less, and it cannot run arbitrary code.
+- **build123d / CadQuery** — Python on a B-rep kernel (OCCT): fillets on arbitrary
+  edges, shells, lofts, sweeps, STEP export, and queries on faces and edges. Use only
+  if Python is available and the part genuinely needs it: organic fillets, lofts or
+  sweeps, or a STEP deliverable. Edge and face selectors are easy to get wrong, and
+  models mix up the CadQuery and build123d APIs, so check every step with a render.
+  The printability and validation rules in `cad-and-openscad.md` still apply.
 
 The skill's scripts assume OpenSCAD. A build123d path is manual: author the Python,
 run it, export STL, then reuse `scripts/openscad.mjs info` and `scripts/slice.mjs`.

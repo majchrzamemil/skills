@@ -15,6 +15,8 @@ in the message.
   openscad -o preview.png --imgsize 1024,768 --viewall --autocenter model.scad
   ```
 
+- If the model includes BOSL2, say so and link `github.com/BelfrySCAD/BOSL2`; it must be
+  in OpenSCAD's library folder (`references/requirements.md`).
 - Do **not** claim to have rendered or validated the model. Say what remains to check.
 
 ## Leg 2 (print)

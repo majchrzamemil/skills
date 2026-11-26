@@ -7,13 +7,14 @@ What each leg needs. Leg 1 and leg 2 are independent — install only what you u
 | Software | Needed for | Minimum |
 |---|---|---|
 | **Node.js** | every script in `scripts/` | **22+** (the SDCP client uses the built-in `WebSocket`; `fetch`/`FormData`/`Blob` need 18+) |
-| **OpenSCAD** | leg 1 — design, render, STL export | any recent 2021.01+ |
+| **OpenSCAD** | leg 1 — design, render, STL export | 2021.01+; a development snapshot (2025+) adds the Manifold backend, which renders much faster |
+| **BOSL2** | leg 1 — rounding, chamfers, teardrops, screw holes, attachments | current `master` of `github.com/BelfrySCAD/BOSL2` |
 | **OrcaSlicer** (or ELEGOO Slicer) | leg 2 — slicing | any recent release with the Centauri Carbon profile |
 | **libfuse2** | running an OrcaSlicer AppImage | only for the AppImage route |
 | **Xvfb + Mesa** | headless PNG previews on a machine with no display | optional |
 | LAN access to the printer | leg 2 — SDCP UDP 3000 / WS 3030 / HTTP 3030 | — |
 
-Leg 1 needs **Node + OpenSCAD**. Leg 2 needs **Node + a slicer + LAN**. Nothing else —
+Leg 1 needs **Node + OpenSCAD + BOSL2**. Leg 2 needs **Node + a slicer + LAN**. Nothing else —
 the printer link uses Node built-ins only, no Python, no npm packages.
 
 ## Fedora
@@ -58,6 +59,19 @@ Do **not** put `ORCA_PROFILES` in `.zshrc` / `.bashrc`: non-interactive shells s
 those files, so the skill would not see it. Use the symlink above, pass `--profiles`
 per command, or set it inline (`ORCA_PROFILES=... node .../slice.mjs run ...`).
 
+## BOSL2 (every system)
+
+BOSL2 is a plain folder of `.scad` files in OpenSCAD's user library directory.
+`openscad --info` prints that directory as `User Library Path` (on Linux,
+`~/.local/share/OpenSCAD/libraries`).
+
+```sh
+LIB="$(openscad --info 2>/dev/null | sed -n 's/^User Library Path: //p')"
+mkdir -p "$LIB"
+git clone --depth 1 https://github.com/BelfrySCAD/BOSL2 "$LIB/BOSL2"
+# update later: git -C "$LIB/BOSL2" pull
+```
+
 ## Other systems
 
 | System | Node | OpenSCAD | Slicer |
@@ -78,6 +92,7 @@ non-standard install is fine:
 ```sh
 node --version                              # >= 22
 openscad --version
+echo 'include <BOSL2/std.scad> cuboid(10, rounding = 1);' > /tmp/bosl2.scad && openscad -o /tmp/bosl2.stl /tmp/bosl2.scad   # no "Can't find include file"
 node scripts/3d-print/scripts/slice.mjs locate   # shows slicer + profiles found
 node scripts/3d-print/scripts/openscad.mjs info model.stl
 ```

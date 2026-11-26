@@ -12,5 +12,5 @@ Tool names in this host:
 Prerequisites on this host:
 
 - `node` 22+ (WebSocket for the SDCP client).
-- `openscad` on PATH for leg 1.
+- `openscad` on PATH and BOSL2 installed for leg 1 (`references/requirements.md`).
 - OrcaSlicer (or ELEGOO Slicer) for leg 2, or pass `--slicer` / profile paths.
