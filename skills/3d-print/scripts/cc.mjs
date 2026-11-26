@@ -103,7 +103,7 @@ async function session(ip, cmds, waitMs = 4000) {
     }
     const topic = msg.Topic || '';
     if (!out.mainboardId && msg.MainboardID) out.mainboardId = msg.MainboardID;
-    const data = msg.Data || {};
+    const data = msg.Data || msg;
     if (topic.includes('/status/')) out.status = data.Status || data || out.status;
     else if (topic.includes('/attributes/')) out.attributes = data.Attributes || data || out.attributes;
     else if (topic.includes('/response/')) out.responses.push(data);
@@ -136,6 +136,7 @@ function summarizeStatus(s) {
     filename: info.Filename,
     print_status: info.Status,
     layer: info.TotalLayer ? `${info.CurrentLayer}/${info.TotalLayer}` : undefined,
+    progress_percent: info.Progress,
     progress_seconds: info.TotalTicks ? `${info.CurrentTicks}/${info.TotalTicks}` : undefined,
     error_number: info.ErrorNumber,
   };
@@ -186,10 +187,10 @@ async function cmdWatch(flags) {
     }
     if ((msg.Topic || '').includes('/status/')) {
       count++;
-      const data = msg.Data || {};
+      const data = msg.Data || msg;
       log(JSON.stringify({ t: now(), ...summarizeStatus(data.Status || data) }));
     } else if ((msg.Topic || '').includes('/error/')) {
-      log(JSON.stringify({ t: now(), error: msg.Data }));
+      log(JSON.stringify({ t: now(), error: msg.Data || msg }));
     }
   });
   ws.send(JSON.stringify(buildRequest(1, {}, id)));

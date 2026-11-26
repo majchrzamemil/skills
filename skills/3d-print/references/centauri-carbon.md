@@ -103,8 +103,13 @@ The protocol ships field names with spelling errors. Match them literally:
 Status and attribute data can appear at more than one nesting level (`Status`,
 `Data.Status`, top level). When parsing, check several locations and both spellings.
 
-The build volume the machine reports is the real 256³; some spec examples show a
-generic `300x300x400` — do not trust the example over the machine's own attributes.
+Only `sdcp/response/*` messages wrap their payload in `Data`. On firmware V1.1.40,
+`sdcp/status/*` and `sdcp/attributes/*` pushes carry `Status` / `Attributes` at the
+top level. The printer clock can be wrong (`TimeStamp` months behind real time), so
+never use it for staleness checks.
+
+`XYZsize` is not the build volume. Firmware V1.1.40 reports `218.88x128.88x220`;
+the real volume is 256³. Some spec examples show a generic `300x300x400`. Use 256³.
 
 ## Alternative: OpenCentauri COSMOS (Klipper + Moonraker)
 
