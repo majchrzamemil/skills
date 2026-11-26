@@ -42,43 +42,53 @@ step: [`skills/3d-print/references/requirements.md`](skills/3d-print/references/
 
 ```bash
 claude plugin marketplace add majchrzamemil/skills
-claude plugin install shopping-pl --marketplace majchrzamemil-skills
-```
-
-Or in one step inside a session (Claude Code 2.1.275+):
-
-```
-/plugin install shopping-pl --marketplace majchrzamemil/skills
+claude plugin install shopping-pl@majchrzamemil-skills
+claude plugin install 3d-print@majchrzamemil-skills
 ```
 
 The marketplace catalog is [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json).
-Working on this repo? Register the local folder once — it then tracks your edits
-with no version bump and no reinstall:
+
+Update after a `git push` to GitHub:
 
 ```bash
-claude plugin marketplace add .
-claude plugin install shopping-pl@majchrzamemil-skills
+claude plugin marketplace update majchrzamemil-skills   # pull the catalog clone
+claude plugin update shopping-pl@majchrzamemil-skills
+claude plugin update 3d-print@majchrzamemil-skills
+```
+
+Working on this repo? Load the working tree for one session instead of
+registering the folder as a marketplace (see [`AGENTS.md`](AGENTS.md)):
+
+```bash
+claude --plugin-dir ~/Documents/repos/skills
 ```
 
 ### OpenCode and other plain-layout hosts
 
+OpenCode reads a plain skills folder. If the Claude Code marketplace is already
+added, link from its GitHub clone — one `marketplace update` then refreshes both:
+
 ```bash
-git clone <this-repo> ~/Documents/repos/skills
-cd ~/Documents/repos/skills
-./install.sh            # symlinks every skill into the harness skill dirs
-./install.sh --dry-run  # show what would be linked
+~/.claude/plugins/marketplaces/majchrzamemil-skills/install.sh
 ```
 
-`install.sh` links each skill into `~/.config/opencode/skills/`. Because the links
-point at the repo, `git pull` updates the harness at once. Add
-`--with-claude-links` to also symlink into `~/.claude/skills/` — only if you are
-*not* installing from the marketplace, otherwise the skill loads twice.
+Without Claude Code, clone the repo and link from the clone; `git pull` updates it:
+
+```bash
+git clone https://github.com/majchrzamemil/skills ~/.local/share/majchrzamemil-skills
+~/.local/share/majchrzamemil-skills/install.sh
+```
+
+`install.sh` links each skill into `~/.config/opencode/skills/` (`--dry-run` shows
+what would be linked). Add `--with-claude-links` to also symlink into
+`~/.claude/skills/` — only if you are *not* installing from the marketplace,
+otherwise the skill loads twice.
 
 Uninstall:
 
 ```bash
-./install.sh --uninstall                          # symlinks
-claude plugin uninstall shopping-pl               # plugin
+./install.sh --uninstall                                # symlinks
+claude plugin uninstall shopping-pl@majchrzamemil-skills  # plugin
 ```
 
 ## Validate
